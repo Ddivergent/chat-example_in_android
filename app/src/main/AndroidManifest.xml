@@ -3,7 +3,9 @@
     package="io.github.iamrajendra.chatexample">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
     <application
+        android:name=".Application"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -14,6 +16,13 @@
             android:name=".ChatActivity"
             android:label="@string/app_name"
             android:theme="@style/AppTheme.NoActionBar">
+
+        </activity>
+        <activity
+            android:name=".UserList"
+            android:label="@string/title_activity_percenage"
+            android:theme="@style/AppTheme.NoActionBar">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

@@ -1,44 +1,66 @@
 package io.github.iamrajendra.chatexample;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
-import android.widget.TextView;
 
 public class ChatActivity extends AppCompatActivity {
-    private ChatSocket socket;
-    private TextView textView_msg;
+    private RecyclerView recyclerViewChat;
     private EditText editText_send;
+    private Application application;
+
+    private ChatAdapter chatAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
+        application = (Application) getApplication();
+        init();
+        registerReceivers();
+
+    }
+
+    private void registerReceivers() {
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                ChatModel chatModel = new ChatModel();
+                chatModel.setMsg(intent.getStringExtra("message"));
+                chatModel.setId(intent.getStringExtra("id"));
+                chatAdapter.addItem(chatModel);
+
+//                textView_msg.append(intent.getStringExtra("message") + "\n" + intent.getStringExtra("id") + "\n");
+            }
+        }, new IntentFilter(ChatSocket.INTENT_ACTION_MESSAGE));
+    }
+
+    private void init() {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        textView_msg  = findViewById(R.id.chat_text_tv);
-        editText_send  = findViewById(R.id.chat_text_et);
+        recyclerViewChat = findViewById(R.id.chat_rv);
+        chatAdapter = new ChatAdapter(this);
+        recyclerViewChat.setAdapter(chatAdapter);
+        recyclerViewChat.setLayoutManager(new LinearLayoutManager(this));
+        editText_send = findViewById(R.id.chat_text_et);
 
-        socket  = new ChatSocket(this);
-        socket.setUrl("http://192.168.1.6:3000/").forceNewConnection(false).
-                reConnection(false).secure(false).init();
-        socket.setCallback(new ChatSocket.Callback() {
-            @Override
-            public void onMessage(String msg) {
-                textView_msg.append(msg+"\n");
-            }
-        });
+
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.send_fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                socket.sendMessage(editText_send.getText().toString());
+                application.sendMessage(editText_send.getText().toString());
                 editText_send.setText("");
             }
         });

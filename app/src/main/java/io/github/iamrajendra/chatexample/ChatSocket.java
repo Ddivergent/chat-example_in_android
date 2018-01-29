@@ -1,7 +1,11 @@
 package io.github.iamrajendra.chatexample;
 
-import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
@@ -9,6 +13,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -26,29 +32,14 @@ import io.socket.emitter.Emitter;
  */
 
 public class ChatSocket {
-    private static String EVENT_CONNECTION= "connection";
-    private static String EVENT_CHAT_MESSAGE= "chat_message";
+    public static final String INTENT_ACTION_JOIN = "action_join";
+    public static final String INTENT_ACTION_STATUS = "action_status";
+    public static final String INTENT_ACTION_MESSAGE = "action_message";
+    private static String EVENT_CONNECTION = "connection";
+    private static String EVENT_CHAT_MESSAGE = "chat_message";
+    private static String EVENT_JOIN = "join";
+    private static String EVENT_STATUS = "status";
     private String TAG = ChatSocket.class.getSimpleName();
-    private Activity activity;
-
-    public ChatSocket(Activity activity) {
-        this.activity =activity;
-    }
-
-    public void sendMessage(String s) {
-        client.emit(EVENT_CHAT_MESSAGE,s);
-    }
-
-    public  interface  Callback
-    {
-        void onMessage(String msg);
-    }
-    private Callback callback;
-
-    public void setCallback(Callback callback) {
-        this.callback = callback;
-    }
-
     private final TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
         public X509Certificate[] getAcceptedIssuers() {
             return new X509Certificate[]{};
@@ -63,6 +54,7 @@ public class ChatSocket {
         }
     }
     };
+    private Context context;
     private Socket client;
     private String url;
     private SSLContext sc;
@@ -70,6 +62,21 @@ public class ChatSocket {
     private boolean isReconecction;
     private boolean isSecure;
     private MessageHandler handler;
+    private Callback callback;
+    private Intent intent;
+
+
+    public ChatSocket(Context context) {
+        this.context = context;
+    }
+
+    public void sendMessage(String s) {
+        client.emit(EVENT_CHAT_MESSAGE, s);
+    }
+
+    public void setCallback(Callback callback) {
+        this.callback = callback;
+    }
 
     public ChatSocket setUrl(String url) {
         this.url = url;
@@ -92,6 +99,7 @@ public class ChatSocket {
     }
 
     public void init() {
+        intent = new Intent();
         handler = new MessageHandler();
         try {
             sc = SSLContext.getInstance("TLS");
@@ -123,11 +131,35 @@ public class ChatSocket {
             client.on(Socket.EVENT_MESSAGE, handler.onEventMessage);
             client.on(ChatSocket.EVENT_CONNECTION, handler.onEventConnection);
             client.on(ChatSocket.EVENT_CHAT_MESSAGE, handler.onEventChatMessge);
+            client.on(ChatSocket.EVENT_STATUS, handler.onEventStatus);
+            client.on(ChatSocket.EVENT_JOIN, handler.onEventJoin);
 
         } catch (URISyntaxException e) {
             e.printStackTrace();
 
         }
+    }
+
+    public boolean isOnline() {
+
+        if (client != null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public String getSocketId() {
+
+        if (client != null) {
+            return client.id();
+        } else {
+            return null;
+        }
+    }
+
+    public interface Callback {
+        void onMessage(String msg);
     }
 
     public static class RelaxedHostNameVerifier implements HostnameVerifier {
@@ -203,28 +235,50 @@ public class ChatSocket {
 
         };
         ;
-        public Emitter.Listener onEventChatMessge= new Emitter.Listener() {
+        public Emitter.Listener onEventChatMessge = new Emitter.Listener() {
             @Override
             public void call(final Object... args) {
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.i(TAG, "call: onEventChatMessge");
-                        String message  = (String) args[0];
-                        Log.i(TAG, "call: onEventChatMessge msg"+message);
-                        callback.onMessage(message);
-
-                    }
-                });
+                intent.setAction(INTENT_ACTION_MESSAGE);
+                intent.putExtra("message", args[0].toString());
+                intent.putExtra("id", args[1].toString());
+                context.sendBroadcast(intent);
 
             }
 
 
         };
-        ;
+        public Emitter.Listener onEventStatus = new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.i(TAG, "call: ");
+                Gson gson = new Gson();
+                UserModel chatModel = gson.fromJson(args[0].toString(), UserModel.class);
 
+                intent.setAction(INTENT_ACTION_STATUS);
+                intent.putExtra("user", chatModel);
+                context.sendBroadcast(intent);
+
+
+            }
+        };
+
+
+        public Emitter.Listener onEventJoin = new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.i(TAG, "call: ");
+                Gson gson = new Gson();
+
+                ArrayList<UserModel> userlist = (ArrayList<UserModel>) gson.fromJson(args[0].toString(), new TypeToken<List<UserModel>>(){}.getType());
+
+                Log.i(TAG, "userlist: " + userlist.size());
+                intent.setAction(INTENT_ACTION_JOIN);
+                intent.putExtra("userlist", userlist);
+                context.sendBroadcast(intent);
+
+            }
+        };
     }
-
 
 
 }
